@@ -3,7 +3,7 @@ name: Build NGINX Docker Image
 on:
   push:
     branches:
-      - main
+      - phase1
 
 jobs:
   build:
