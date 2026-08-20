@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: sre-nginx
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: sre-nginx
+
+  template:
+    metadata:
+      labels:
+        app: sre-nginx
+
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+
+      containers:
+        - name: nginx
+          image: ghcr.io/charvibarhate/sre-nginx:1bac3b9c11646e497cb7d9bcbc388748f9d4981e
+          ports:
+            - containerPort: 80
