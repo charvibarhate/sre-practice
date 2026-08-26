@@ -22,6 +22,6 @@ spec:
 
       containers:
         - name: nginx
-          image: ghcr.io/charvibarhate/sre-nginx:1bac3b9c11646e497cb7d9bcbc388748f9d4981e
+          image: ghcr.io/charvibarhate/sre-nginx:296698ab55a2bc2721335c35a615699d6a0c0b5f
           ports:
             - containerPort: 80

@@ -1,4 +1,4 @@
-name: Build and Push NGINX Image
+name: Build, Push and Deploy NGINX
 
 on:
   push:
@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,3 +32,29 @@ jobs:
       - name: Push Docker image
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/sre-nginx:${{ github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::571841331213:role/GitHubActions-SRE-NGINX
+          aws-region: ap-south-1
+
+      - name: Deploy to EC2 k3s using SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids i-0fe6a8a4605c22787 \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "sudo kubectl set image deployment/sre-nginx nginx=ghcr.io/charvibarhate/sre-nginx:${{ github.sha }}",
+              "sudo kubectl rollout status deployment/sre-nginx --timeout=120s"
+            ]' \
+            --region ap-south-1 \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id i-0fe6a8a4605c22787 \
+            --region ap-south-1
