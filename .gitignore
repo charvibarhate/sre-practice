@@ -1,0 +1,11 @@
+github-actions-ssm-policy.json
+github-actions-trust.json
+
+# Terraform local cache and generated files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+*.pem

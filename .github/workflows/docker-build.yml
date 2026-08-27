@@ -3,7 +3,7 @@ name: Build, Push and Deploy NGINX
 on:
   push:
     branches:
-      - phase1
+      - main
 
 permissions:
   contents: read
