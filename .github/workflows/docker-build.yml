@@ -46,7 +46,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "sudo kubectl set image deployment/sre-nginx nginx=ghcr.io/charvibarhate/sre-nginx:${{ github.sha }}",
-              "sudo kubectl rollout status deployment/sre-nginx --timeout=120s"
+              "sudo kubectl rollout status deployment/sre-nginx --timeout=120s",
               "curl -fsS http://localhost:30080 > /dev/null"
             ]' \
             --region ap-south-1 \
