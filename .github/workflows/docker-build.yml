@@ -39,16 +39,28 @@ jobs:
           role-to-assume: arn:aws:iam::571841331213:role/GitHubActions-SRE-NGINX
           aws-region: ap-south-1
 
-      - name: Deploy to EC2 k3s using SSM
+      - name: Deploy Kubernetes manifest using SSM
         run: |
+          # Replace IMAGE_TAG in Git manifest with this commit SHA
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s/deployment.yml > deployment-rendered.yml
+
+          # Encode manifest so it can safely travel through SSM
+          MANIFEST=$(base64 -w 0 deployment-rendered.yml)
+
+          # Create SSM parameters safely
+          jq -n --arg manifest "$MANIFEST" '{
+            commands: [
+              "echo \($manifest) | base64 -d > /tmp/deployment.yml",
+              "sudo kubectl apply -f /tmp/deployment.yml",
+              "sudo kubectl rollout status deployment/sre-nginx --timeout=120s",
+              "curl -fsS http://localhost:30080 > /dev/null"
+            ]
+          }' > ssm-parameters.json
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids i-0fe6a8a4605c22787 \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=[
-              "sudo kubectl set image deployment/sre-nginx nginx=ghcr.io/charvibarhate/sre-nginx:${{ github.sha }}",
-              "sudo kubectl rollout status deployment/sre-nginx --timeout=120s",
-              "curl -fsS http://localhost:30080 > /dev/null"
-            ]' \
+            --parameters file://ssm-parameters.json \
             --region ap-south-1 \
             --query "Command.CommandId" \
             --output text)
