@@ -53,7 +53,7 @@ jobs:
               "echo \($manifest) | base64 -d > /tmp/deployment.yml",
               "sudo kubectl apply -f /tmp/deployment.yml",
               "sudo kubectl rollout status deployment/sre-nginx --timeout=120s",
-              "curl -fsS http://localhost:30080 > /dev/null"
+              "SERVICE_IP=$(sudo kubectl get svc sre-nginx-service -o jsonpath='{.spec.clusterIP}') && curl -fsS http://$SERVICE_IP > /dev/null"S
             ]
           }' > ssm-parameters.json
 
