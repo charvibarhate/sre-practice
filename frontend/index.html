@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRE Practice - Microservices Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .status.healthy {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.unhealthy {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .data-section {
+            margin: 20px 0;
+        }
+        .data-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .metrics {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 SRE Practice - Microservices Demo</h1>
+        
+        <div id="status" class="status">
+            <span class="loading">Checking service health...</span>
+        </div>
+
+        <div class="data-section">
+            <h2>📊 User Data</h2>
+            <button onclick="fetchUsers()">Load Users</button>
+            <button onclick="fetchMetrics()">Get Metrics</button>
+            <div id="users"></div>
+        </div>
+
+        <div class="metrics">
+            <h3>📈 System Metrics</h3>
+            <div id="metrics">
+                <span class="loading">Click "Get Metrics" to load system health data</span>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; padding: 15px; background: #fff3cd; border-radius: 4px;">
+            <h3>🔧 SRE Practice Tasks</h3>
+            <ul>
+                <li>Monitor service health and response times</li>
+                <li>Test service failure scenarios</li>
+                <li>Observe inter-service communication</li>
+                <li>Practice debugging when services are slow/down</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';  // Will be proxied through nginx or accessed directly
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                if (data.status === 'healthy') {
+                    statusDiv.className = 'status healthy';
+                    statusDiv.innerHTML = `✅ All Systems Operational<br>
+                    Gateway: ${data.services.gateway}<br>
+                    Backend: ${data.services.backend}<br>
+                    Response Time: ${data.response_time}ms`;
+                } else {
+                    statusDiv.className = 'status unhealthy';
+                    statusDiv.innerHTML = `⚠️ System Degraded<br>${data.message}`;
+                }
+            } catch (error) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.className = 'status unhealthy';
+                statusDiv.innerHTML = `❌ Service Unavailable: ${error.message}`;
+            }
+        }
+
+        async function fetchUsers() {
+            const usersDiv = document.getElementById('users');
+            usersDiv.innerHTML = '<span class="loading">Loading users...</span>';
+            
+            try {
+                const response = await fetch(`${API_URL}/users`);
+                const data = await response.json();
+                
+                if (data.users && data.users.length > 0) {
+                    usersDiv.innerHTML = data.users.map(user => `
+                        <div class="data-item">
+                            <strong>${user.name}</strong> (${user.email})<br>
+                            Role: ${user.role} | ID: ${user.id}
+                        </div>
+                    `).join('');
+                } else {
+                    usersDiv.innerHTML = '<p>No users found</p>';
+                }
+            } catch (error) {
+                usersDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function fetchMetrics() {
+            const metricsDiv = document.getElementById('metrics');
+            metricsDiv.innerHTML = '<span class="loading">Loading metrics...</span>';
+            
+            try {
+                const response = await fetch(`${API_URL}/metrics`);
+                const data = await response.json();
+                
+                metricsDiv.innerHTML = `
+                    <p><strong>Gateway Uptime:</strong> ${data.gateway.uptime}</p>
+                    <p><strong>Gateway Requests:</strong> ${data.gateway.requests}</p>
+                    <p><strong>Backend Uptime:</strong> ${data.backend.uptime}</p>
+                    <p><strong>Backend DB Connections:</strong> ${data.backend.db_connections}</p>
+                    <p><strong>Avg Response Time:</strong> ${data.avg_response_time}ms</p>
+                    <p><strong>Error Rate:</strong> ${data.error_rate}%</p>
+                `;
+            } catch (error) {
+                metricsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-check health every 10 seconds
+        checkHealth();
+        setInterval(checkHealth, 10000);
+    </script>
+</body>
+</html>

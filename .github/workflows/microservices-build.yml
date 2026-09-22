@@ -1,0 +1,94 @@
+name: Build, Push and Deploy Microservices
+
+on:
+  push:
+    branches:
+      - main
+      - phase1
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Frontend image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/sre-frontend:${{ github.sha }} ./frontend
+          docker push ghcr.io/${{ github.repository_owner }}/sre-frontend:${{ github.sha }}
+
+      - name: Build and push API Gateway image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/sre-api-gateway:${{ github.sha }} ./api-gateway
+          docker push ghcr.io/${{ github.repository_owner }}/sre-api-gateway:${{ github.sha }}
+
+      - name: Build and push Backend image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/sre-backend:${{ github.sha }} ./backend
+          docker push ghcr.io/${{ github.repository_owner }}/sre-backend:${{ github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::571841331213:role/GitHubActions-SRE-NGINX
+          aws-region: ap-south-1
+
+      - name: Deploy Kubernetes manifests using SSM
+        run: |
+          # Replace IMAGE_TAG in all manifests with this commit SHA
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/frontend-deployment.yml > frontend-deployment-rendered.yml
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/api-gateway-deployment.yml > api-gateway-deployment-rendered.yml
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/backend-deployment.yml > backend-deployment-rendered.yml
+
+          # Combine all manifests for SSM
+          cat frontend-deployment-rendered.yml k8s-microservices/frontend-service.yml > all-manifests.yml
+          cat api-gateway-deployment-rendered.yml k8s-microservices/api-gateway-service.yml >> all-manifests.yml
+          cat backend-deployment-rendered.yml k8s-microservices/backend-service.yml >> all-manifests.yml
+
+          # Encode manifest so it can safely travel through SSM
+          MANIFEST=$(base64 -w 0 all-manifests.yml)
+
+          # Create SSM parameters safely
+          jq -n --arg manifest "$MANIFEST" '{
+            commands: [
+              "echo \($manifest) | base64 -d > /tmp/microservices-manifest.yml",
+              "sudo kubectl apply -f /tmp/microservices-manifest.yml",
+              "sudo kubectl rollout status deployment/frontend --timeout=120s",
+              "sudo kubectl rollout status deployment/api-gateway --timeout=120s",
+              "sudo kubectl rollout status deployment/backend --timeout=120s",
+              "echo \"Waiting for services to be ready...\"",
+              "sleep 10",
+              "FRONTEND_IP=$(sudo kubectl get svc frontend-service -o jsonpath='{.spec.clusterIP}') && echo \"Frontend IP: $FRONTEND_IP\"",
+              "GATEWAY_IP=$(sudo kubectl get svc api-gateway-service -o jsonpath='{.spec.clusterIP}') && echo \"Gateway IP: $GATEWAY_IP\"",
+              "BACKEND_IP=$(sudo kubectl get svc backend-service -o jsonpath='{.spec.clusterIP}') && echo \"Backend IP: $BACKEND_IP\""
+            ]
+          }' > ssm-parameters.json
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids i-0fe6a8a4605c22787 \
+            --document-name "AWS-RunShellScript" \
+            --parameters file://ssm-parameters.json \
+            --region ap-south-1 \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id i-0fe6a8a4605c22787 \
+            --region ap-south-1

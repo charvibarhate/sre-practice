@@ -25,3 +25,11 @@ spec:
           image: ghcr.io/charvibarhate/sre-nginx:IMAGE_TAG
           ports:
             - containerPort: 80
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
