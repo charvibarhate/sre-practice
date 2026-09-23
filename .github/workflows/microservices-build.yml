@@ -68,14 +68,7 @@ jobs:
             commands: [
               "echo \($manifest) | base64 -d > /tmp/microservices-manifest.yml",
               "sudo kubectl apply -f /tmp/microservices-manifest.yml",
-              "sudo kubectl rollout status deployment/frontend --timeout=120s",
-              "sudo kubectl rollout status deployment/api-gateway --timeout=120s",
-              "sudo kubectl rollout status deployment/backend --timeout=120s",
-              "echo \"Waiting for services to be ready...\"",
-              "sleep 10",
-              "FRONTEND_IP=$(sudo kubectl get svc frontend-service -o jsonpath='{.spec.clusterIP}') && echo \"Frontend IP: $FRONTEND_IP\"",
-              "GATEWAY_IP=$(sudo kubectl get svc api-gateway-service -o jsonpath='{.spec.clusterIP}') && echo \"Gateway IP: $GATEWAY_IP\"",
-              "BACKEND_IP=$(sudo kubectl get svc backend-service -o jsonpath='{.spec.clusterIP}') && echo \"Backend IP: $BACKEND_IP\""
+              "echo \"Deployment initiated. Check status manually with: sudo kubectl get pods -w\""
             ]
           }' > ssm-parameters.json
 
