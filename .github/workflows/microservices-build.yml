@@ -55,22 +55,22 @@ jobs:
           sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/api-gateway-deployment.yml > api-gateway-deployment-rendered.yml
           sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/backend-deployment.yml > backend-deployment-rendered.yml
 
-          # Combine all manifests for SSM with document separators
-          cat frontend-deployment-rendered.yml k8s-microservices/frontend-service.yml > all-manifests.yml
-          echo "---" >> all-manifests.yml
-          cat api-gateway-deployment-rendered.yml k8s-microservices/api-gateway-service.yml >> all-manifests.yml
-          echo "---" >> all-manifests.yml
-          cat backend-deployment-rendered.yml k8s-microservices/backend-service.yml >> all-manifests.yml
-
-          # Encode manifest so it can safely travel through SSM
-          MANIFEST=$(base64 -w 0 all-manifests.yml)
-
-          # Create SSM parameters safely
-          jq -n --arg manifest "$MANIFEST" '{
+          # Apply each service separately to avoid YAML parsing issues
+          jq -n --arg frontend "$(base64 -w 0 frontend-deployment-rendered.yml)" --arg frontend_svc "$(base64 -w 0 k8s-microservices/frontend-service.yml)" --arg gateway "$(base64 -w 0 api-gateway-deployment-rendered.yml)" --arg gateway_svc "$(base64 -w 0 k8s-microservices/api-gateway-service.yml)" --arg backend "$(base64 -w 0 backend-deployment-rendered.yml)" --arg backend_svc "$(base64 -w 0 k8s-microservices/backend-service.yml)" '{
             commands: [
-              "echo \($manifest) | base64 -d > /tmp/microservices-manifest.yml",
-              "sudo kubectl apply -f /tmp/microservices-manifest.yml",
-              "echo \"Deployment initiated. Check status manually with: sudo kubectl get pods -w\""
+              "echo \($frontend) | base64 -d > /tmp/frontend.yml",
+              "echo \($frontend_svc) | base64 -d > /tmp/frontend-svc.yml",
+              "sudo kubectl apply -f /tmp/frontend.yml",
+              "sudo kubectl apply -f /tmp/frontend-svc.yml",
+              "echo \($gateway) | base64 -d > /tmp/gateway.yml",
+              "echo \($gateway_svc) | base64 -d > /tmp/gateway-svc.yml",
+              "sudo kubectl apply -f /tmp/gateway.yml",
+              "sudo kubectl apply -f /tmp/gateway-svc.yml",
+              "echo \($backend) | base64 -d > /tmp/backend.yml",
+              "echo \($backend_svc) | base64 -d > /tmp/backend-svc.yml",
+              "sudo kubectl apply -f /tmp/backend.yml",
+              "sudo kubectl apply -f /tmp/backend-svc.yml",
+              "echo \"Deployment completed. Check status with: sudo kubectl get pods\""
             ]
           }' > ssm-parameters.json
 
@@ -83,8 +83,3 @@ jobs:
             --output text)
 
           echo "SSM Command ID: $COMMAND_ID"
-
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id i-0fe6a8a4605c22787 \
-            --region ap-south-1
