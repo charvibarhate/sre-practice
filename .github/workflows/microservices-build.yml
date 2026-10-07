@@ -55,9 +55,11 @@ jobs:
           sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/api-gateway-deployment.yml > api-gateway-deployment-rendered.yml
           sed "s|IMAGE_TAG|${{ github.sha }}|g" k8s-microservices/backend-deployment.yml > backend-deployment-rendered.yml
 
-          # Combine all manifests for SSM
+          # Combine all manifests for SSM with document separators
           cat frontend-deployment-rendered.yml k8s-microservices/frontend-service.yml > all-manifests.yml
+          echo "---" >> all-manifests.yml
           cat api-gateway-deployment-rendered.yml k8s-microservices/api-gateway-service.yml >> all-manifests.yml
+          echo "---" >> all-manifests.yml
           cat backend-deployment-rendered.yml k8s-microservices/backend-service.yml >> all-manifests.yml
 
           # Encode manifest so it can safely travel through SSM
